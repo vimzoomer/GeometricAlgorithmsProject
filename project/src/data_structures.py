@@ -174,7 +174,6 @@ class XYNode:
         self.left = None
         self.right = None
 
-
 class XNode(XYNode):
     def __init__(self, p: Point):
         super().__init__()
@@ -283,7 +282,7 @@ class DTree:
             segment.node.right = down.node
 
 
-    def update_multiple(self, trapezoids: list[Trapezoid], s: Segment, splitted_trapezoids: dict):
+    def update_multiple(self, trapezoids: list[Trapezoid], s: Segment, split_trapezoids: dict):
         n = len(trapezoids)
 
         for i in range(n):
@@ -293,5 +292,5 @@ class DTree:
 
             to_swap.node = segment.node
 
-            segment.node.left = splitted_trapezoids[trapezoids[i]][0].node
-            segment.node.right = splitted_trapezoids[trapezoids[i]][1].node
+            segment.node.left = split_trapezoids[trapezoids[i]][0].node
+            segment.node.right = split_trapezoids[trapezoids[i]][1].node
