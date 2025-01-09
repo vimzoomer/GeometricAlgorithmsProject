@@ -28,7 +28,7 @@ class TrapezoidalMap:
         p, q = s.get_points()
         intersected_trapezoids = []
         first_trapezoid = self.tree.find(self.tree.root, p, s.a).node.trapezoid
-        self.vis.show()
+        #self.vis.show()
         intersected_trapezoids.append(first_trapezoid)
 
         j = 0

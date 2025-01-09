@@ -1,16 +1,22 @@
+import random
+
+import numpy as np
+
+
 def generateParallelSegments(maxX, maxY, n):
-    delta_x = maxX / (2 * n + 2)
     delta_y = maxY / n
     y = maxY
-    x_max = maxX
-    x_min = 0
     segments = []
+    x = np.linspace(0, maxX, 2 * n)
+    x = list(map(float, x))
 
     for _ in range(n):
+        x1 = random.choice(x)
+        x.remove(x1)
+        x2 = random.choice(x)
+        x.remove(x2)
         y -= delta_y
-        x_max -= delta_x
-        x_min += delta_x
-        segments.append(((x_min, y), (x_max, y)))
+        segments.append(((min(x1, x2), y), (max(x1, x2), y)))
 
     return segments
 
