@@ -3,34 +3,32 @@ from .visualizer.main import Visualizer
 import random
 
 class TrapezoidalMap:
-    visualizers = 0
-    segments = None
 
     def __init__(self, S: list[tuple[tuple[float, float], tuple[float, float]]]):
-        #permuted_s = random.sample(S, len(S))
-        permuted_s = S
+        #permuted_s = S
+        permuted_s = random.sample(S, len(S))
         self.segments = self.__create_segments(permuted_s)
-        self.used_segments = []
         self.rect_bound = self.__create_rect_bound()
         self.tree = DTree()
-        self.tree.root = Leaf(self.rect_bound)
-        self.root_trapezoid = None
-        TrapezoidalMap.segments = S
+        self.tree.root = Node(Leaf(self.rect_bound))
 
+        self.vis = Visualizer()
+        self.vis.add_line_segment([self.rect_bound.up.to_tuple(), self.rect_bound.down.to_tuple()], color='red')
+        ls = self.vis.add_line_segment(self.rect_bound.get_segments(as_tuples=True))
+        self.get_remove_handle = {self.rect_bound : ls}
 
     def build_trapezoidal_map(self):
-        used_segments = []
         for i in range(len(self.segments)):
-            used_segments.append(self.segments[i].to_tuple())
             intersected_trapezoids = self.follow_segment(self.segments[i])
-            self.root_trapezoid = self.update_map(intersected_trapezoids, self.segments[i])
+            self.update_map(intersected_trapezoids, self.segments[i])
 
         return self.tree
 
     def follow_segment(self, s: Segment):
         p, q = s.get_points()
         intersected_trapezoids = []
-        first_trapezoid = self.tree.find(self.tree.root, p, s.a)
+        first_trapezoid = self.tree.find(self.tree.root, p, s.a).node.trapezoid
+        self.vis.show()
         intersected_trapezoids.append(first_trapezoid)
 
         j = 0
@@ -41,7 +39,6 @@ class TrapezoidalMap:
                 intersected_trapezoids.append(intersected_trapezoids[j].bottom_right)
             j += 1
 
-        print("Intersected:", intersected_trapezoids)
         return intersected_trapezoids
 
     @staticmethod
@@ -55,7 +52,8 @@ class TrapezoidalMap:
 
         if trapezoid.left.x < p.x - Segment.eps:
             left = Trapezoid(trapezoid.left, p, upper_segment, lower_segment)
-            left.connect_to_top_left(top_left)
+            if top_left is not None:
+                left.connect_to_top_left(top_left)
             left.connect_to_bottom_left(bottom_left)
             left.connect_to_top_right(top)
             left.connect_to_bottom_right(bottom)
@@ -193,15 +191,20 @@ class TrapezoidalMap:
     def update_map(self, trapezoids: list[Trapezoid], s: Segment):
         if len(trapezoids) == 1:
             top, bottom, left, right = TrapezoidalMap.divide_single_trapezoid(trapezoids[0], s)
-            Leaf(top)
-            Leaf(bottom)
-            Leaf(right)
-            Leaf(left)
+            list_to_visualize = [left, top, bottom, right]
+            dict_to_visualize = {}
+            for t in list_to_visualize:
+                dict_to_visualize[t] = {trapezoids[0]}
+            self.update_visualizer([left, top, bottom, right], s, dict_to_visualize)
+
+            trapezoids[0].node = Node(Leaf(trapezoids[0]))
+            top.node = Node(Leaf(top))
+            bottom.node = Node(Leaf(bottom))
+            if left:
+                left.node = Node(Leaf(left))
+            if right:
+                right.node = Node(Leaf(right))
             self.tree.update_single(trapezoids[0], s, top, bottom, left, right)
-            self.used_segments.append(s.to_tuple())
-            vis = TrapezoidalMap.get_visualizer(top, self.used_segments)
-            vis.show()
-            return top
         else:
             tops = []
             bottoms = []
@@ -219,8 +222,6 @@ class TrapezoidalMap:
 
             for i in range(1, len(trapezoids) - 1):
                 top_prev, bottom_prev, is_top_merged, is_bottom_merged = TrapezoidalMap.divide_middle_trapezoid(trapezoids[i], s, top_prev, bottom_prev)
-                #trapezoids[i].leaf = Leaf(trapezoids[i])
-                #splitted_trapezoids.append((top_prev, bottom_prev))
                 from_trapezoid[top_prev] = {trapezoids[i]}
                 from_trapezoid[bottom_prev] = {trapezoids[i]}
 
@@ -237,8 +238,6 @@ class TrapezoidalMap:
 
                 tops.append(top_prev)
                 bottoms.append(bottom_prev)
-
-            #self.tree.update_multiple(trapezoids[1:-2:], s, splitted_trapezoids)
 
             top_prev, bottom_prev, right, is_top_merged, is_bottom_merged = TrapezoidalMap.divide_rightmost_trapezoid(trapezoids[-1], s, top_prev, bottom_prev)
 
@@ -259,34 +258,28 @@ class TrapezoidalMap:
             tops.append(top_prev)
             bottoms.append(bottom_prev)
 
-            #vis = TrapezoidalMap.get_visualizer(top_prev, TrapezoidalMap.segments)
-            #vis.show()
-
             for top in tops:
                 for trapezoid in from_trapezoid[top]:
                     splitted_trapezoids[trapezoid] = [top]
-                    Leaf(top)
+                    if top.node is None:
+                        top.node = Node(Leaf(top))
 
             for bot in bottoms:
                 for trapezoid in from_trapezoid[bot]:
                     splitted_trapezoids[trapezoid].append(bot)
-                    Leaf(bot)
+                    if bot.node is None:
+                        bot.node = Node(Leaf(bot))
 
-            Leaf(right)
-            Leaf(left)
+            if left:
+                left.node = Node(Leaf(left))
+            if right:
+                right.node = Node(Leaf(right))
 
-            print(s)
-            print(tops)
-            print(bottoms)
-            self.used_segments.append(s.to_tuple())
-            vis = TrapezoidalMap.get_visualizer(top_prev, self.used_segments)
-            vis.show()
+            self.update_visualizer([left] + tops + bottoms + [right], s, from_trapezoid)
 
             self.tree.update_single(trapezoids[0], s, splitted_trapezoids[trapezoids[0]][0], splitted_trapezoids[trapezoids[0]][1], left, None)
             self.tree.update_multiple(trapezoids[1:-1], s, splitted_trapezoids)
             self.tree.update_single(trapezoids[-1], s, splitted_trapezoids[trapezoids[-1]][0], splitted_trapezoids[trapezoids[-1]][1], None, right)
-
-            return top_prev
 
     @staticmethod
     def __create_segments(permuted_s) -> list[Segment]:
@@ -315,38 +308,22 @@ class TrapezoidalMap:
 
         return Trapezoid(Point(min_x, min_y), Point(max_x, max_y), topSegment, bottomSegment)
 
-    @staticmethod
-    def get_visualizer(trapezoid, segments) -> Visualizer:
-        TrapezoidalMap.visualizers += 1
-        visited = set()
-        queue = [trapezoid]
-        vis = Visualizer()
+    def update_visualizer(self, trapezoids: list[Trapezoid], s: Segment, split_trapezoids: dict[Trapezoid, set[Trapezoid]]):
+        self.vis.add_line_segment(s.to_tuple(), color='red')
+        for trapezoid in trapezoids:
+            if trapezoid in split_trapezoids:
+                for trapezoid_to_remove in split_trapezoids[trapezoid]:
+                    if trapezoid_to_remove in self.get_remove_handle:
+                        to_remove = self.get_remove_handle[trapezoid_to_remove]
+                        self.vis.remove_figure(to_remove)
+                        del self.get_remove_handle[trapezoid_to_remove]
+                    to_remove = []
+            if trapezoid is not None:
+                ls = self.vis.add_line_segment(trapezoid.get_segments(as_tuples=True))
+                self.get_remove_handle[trapezoid] = ls
 
-        while queue:
-            trapezoid = queue.pop(0)
 
-            if trapezoid in visited:
-                continue
-            visited.add(trapezoid)
 
-            """
-            print("----------------------")
-            print("Trapezoid: ", trapezoid)
-            for n in trapezoid.get_neighbours():
-                print(n)
-            """
-
-            line_segments = trapezoid.get_segments(as_tuples=True)
-            vis.add_line_segment(line_segments)
-
-            for neighbor in [trapezoid.top_left, trapezoid.bottom_left, trapezoid.bottom_right,
-                             trapezoid.top_right]:
-                if neighbor and neighbor not in visited:
-                    queue.append(neighbor)
-
-        vis.add_line_segment(segments, color='red')
-
-        return vis
 
 
 

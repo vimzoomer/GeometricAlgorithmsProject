@@ -1,6 +1,11 @@
 from __future__ import annotations
 from typing import Tuple
-from .utils import Position
+from enum import Enum
+
+class Position(Enum):
+    BELOW = -1
+    ON = 0
+    ABOVE = 1
 
 class Point:
     def __init__(self, x: float, y: float):
@@ -78,7 +83,7 @@ class Trapezoid:
         self.top_right = None
         self.bottom_right = None
 
-        self.leaf = None
+        self.node = None
 
     def get_neighbours(self):
         return [self.top_left, self.bottom_left, self.top_right, self.bottom_right]
@@ -99,7 +104,7 @@ class Trapezoid:
         p = self.get_points(as_tuples)
         if not as_tuples:
             return Segment(p[0], p[1]), Segment(p[1], p[2]), Segment(p[2], p[3]), Segment(p[3], p[0])
-        return (p[0], p[1]), (p[1], p[2]), (p[2], p[3]), (p[3], p[0])
+        return (p[1], p[2]), (p[3], p[0])
 
     def connect_to_top_left(self, trapezoid: (Trapezoid, None)):
         self.top_left = trapezoid
@@ -137,182 +142,156 @@ class Leaf:
         return f"{self.trapezoid}"
 
     def __eq__(self, other: Leaf) -> bool:
-        if Node.are_same_type(self, other):
-            return self.trapezoid == other.trapezoid
-
-        return False
+        return self.trapezoid == other.trapezoid
 
 class Node:
-    def __init__(self):
-        self.left = None
-        self.right = None
+    def __init__(self, node: (XNode, YNode, Leaf)):
+        self.node = node
 
-    @staticmethod
-    def is_x_node(node: (Node, Leaf)) -> bool:
-        return isinstance(node, XNode)
+    def is_x_node(self) -> bool:
+        return isinstance(self.node, XNode)
 
-    @staticmethod
-    def is_y_node(node: (Node, Leaf)) -> bool:
-        return isinstance(node, YNode)
+    def is_y_node(self) -> bool:
+        return isinstance(self.node, YNode)
 
-    @staticmethod
-    def is_leaf(node: (Node, Leaf)) -> bool:
-        return isinstance(node, Leaf)
+    def is_leaf(self) -> bool:
+        return isinstance(self.node, Leaf)
 
-    @staticmethod
-    def are_same_type(first: Node, second: Node):
-        if (Node.is_leaf(first) and Node.is_leaf(second)) or (Node.is_y_node(first) and Node.is_y_node(second)) or (Node.is_x_node(first) and Node.is_x_node(second)):
+    def are_same_type(self, second: Node):
+        if (self.is_leaf() and second.is_leaf()) or (self.is_y_node() and second.is_y_node()) or (
+                self.is_x_node() and second.is_x_node()):
             return True
 
         return False
 
-class XNode(Node):
+    def __eq__(self, other: Node):
+        if self.are_same_type(other):
+            return self.node == other.node
+        return False
+
+class XYNode:
+    def __init__(self):
+        self.left = None
+        self.right = None
+
+
+class XNode(XYNode):
     def __init__(self, p: Point):
         super().__init__()
         self.p = p
 
-    def __eq__(self, other):
-        if Node.are_same_type(self, other):
-            return self.p == other.p
+    def __eq__(self, other: XNode):
+        return self.p == other.p
 
-        return False
-
-class YNode(Node):
+class YNode(XYNode):
     def __init__(self, s: Segment):
         super().__init__()
         self.s = s
 
-    def __eq__(self, other):
-        if Node.are_same_type(self, other):
-            return self.s == other.s
-
-        return False
+    def __eq__(self, other: YNode):
+        return self.s == other.s
 
 class DTree:
     def __init__(self):
         self.root = None
 
-    def find(self, node: (Node, YNode, XNode), point: Point, a: float = None, tail: Node = None, parent: list[Node] = []):
-        if Node.is_leaf(node):
-            parent.append(tail)
-            return node.trapezoid
-        elif Node.is_x_node(node):
-            if node.p > point:
-                return self.find(node.left, point, a, node, parent)
-            else:
-                return self.find(node.right, point, a, node, parent)
-        else:
-            position = node.s.position(point)
-            if position == Position.ABOVE:
-                return self.find(node.left, point, a, node, parent)
-            elif position == Position.BELOW:
-                return self.find(node.right, point, a, node, parent)
-            else:
-                if node.s.a < a:
-                    return self.find(node.left, point, a, node, parent)
-                else:
-                    return self.find(node.right, point, a, node, parent)
-
-    def find_parent(self, node: Node, target_node: Leaf):
-        trapezoid = target_node.trapezoid
-        mid_x = (trapezoid.left.x+trapezoid.right.x) / 2
-        mid_point = Point(mid_x, trapezoid.down.a * mid_x + trapezoid.down.b + 10**(-12))
-        parent = []
-        self.find(self.root, mid_point, None, None, parent)
-        if self.root == target_node:
-            return self.root
-        if len(parent) == 1:
-            return parent[0]
-        return None
-        '''if not node:
-            return None
-
-        if self.root == target_node:
-            return self.root
-        if Node.is_leaf(node):
-            return None
-
-        if node.right == target_node or node.left == target_node:
+    def find(self, node: Node, point: Point, a: float = None):
+        if node.is_leaf():
             return node
+        elif node.is_x_node():
+            if node.node.p > point:
+                return self.find(node.node.left, point, a)
+            else:
+                return self.find(node.node.right, point, a)
+        else:
+            position = node.node.s.position(point)
+            if position == Position.ABOVE:
+                return self.find(node.node.left, point, a)
+            elif position == Position.BELOW:
+                return self.find(node.node.right, point, a)
+            else:
+                if node.node.s.a < a:
+                    return self.find(node.node.left, point, a)
+                else:
+                    return self.find(node.node.right, point, a)
 
-        return self.find_parent(node.right, target_node) or self.find_parent(node.left, target_node)'''
+    def find_node(self, target_node: Node):
+        trapezoid = target_node.node.trapezoid
+        mid_x = (trapezoid.left.x+trapezoid.right.x) / 2
+        mid_upper_y = trapezoid.up.a * mid_x + trapezoid.up.b
+        mid_lower_y = trapezoid.down.a * mid_x + trapezoid.down.b
+        mid_point = Point(mid_x, mid_lower_y + (mid_upper_y - mid_lower_y) / 2)
 
-    def update_single(self, trapezoid: Trapezoid, segment: Segment, up: Trapezoid, down: Trapezoid, left: (Trapezoid, None), right: (Trapezoid, None)):
-        node = self.find_parent(self.root, trapezoid.leaf)
-        p, q = segment.get_points()
+        node_found = self.find(self.root, mid_point, trapezoid.down.a)
 
-        segment_left_node = XNode(p)
-        segment_right_node = XNode(q)
-        segment_node = YNode(segment)
+        return node_found
+
+    def update_single(self, trapezoid: Trapezoid, s: Segment, up: Trapezoid, down: Trapezoid, left: (Trapezoid, None), right: (Trapezoid, None)):
+        to_swap = self.find_node(trapezoid.node)
+        p, q = s.get_points()
+
+        segment_left = Node(XNode(p))
+        segment_right = Node(XNode(q))
+        segment = Node(YNode(s))
+
 
         if left and right:
-            if node == self.root and Node.is_leaf(node):
-                self.root = segment_left_node
-            elif node.left == trapezoid.leaf:
-                node.left = segment_left_node
+            if to_swap == self.root:
+                self.root.node = segment_left.node
             else:
-                node.right = segment_left_node
+                to_swap.node = segment_left.node
 
-            segment_left_node.left = left.leaf
-            segment_left_node.right = segment_right_node
+            segment_left.node.left = left.node
+            segment_left.node.right = segment_right
 
-            segment_right_node.left = segment_node
-            segment_right_node.right = right.leaf
+            segment_right.node.left = segment
+            segment_right.node.right = right.node
 
-            segment_node.left = up.leaf
-            segment_node.right = down.leaf
+            segment.node.left = up.node
+            segment.node.right = down.node
 
         elif left and not right:
-            if node == self.root and Node.is_leaf(node):
-                self.root = segment_left_node
-            elif node.left == trapezoid.leaf:
-                node.left = segment_left_node
+            if to_swap == self.root:
+                self.root.node = segment_left.node
             else:
-                node.right = segment_left_node
+                to_swap.node = segment_left.node
 
-            segment_left_node.left = left.leaf
-            segment_left_node.right = segment_node
+            segment_left.node.left = left.node
+            segment_left.node.right = segment
 
-            segment_node.left = up.leaf
-            segment_node.right = down.leaf
+            segment.node.left = up.node
+            segment.node.right = down.node
 
         elif not left and right:
-            if node == self.root and Node.is_leaf(node):
-                self.root = segment_right_node
-            elif node.left == trapezoid.leaf:
-                node.left = segment_right_node
+            if to_swap == self.root:
+                self.root.node = segment_right.node
             else:
-                node.right = segment_right_node
+                to_swap.node = segment_right.node
 
-            segment_right_node.left = segment_node
-            segment_right_node.right = right.leaf
+            segment_right.node.left = segment
+            segment_right.node.right = right.node
 
-            segment_node.left = up.leaf
-            segment_node.right = down.leaf
-
+            segment.node.left = up.node
+            segment.node.right = down.node
         else:
-            if node == self.root and Node.is_leaf(node):
-                self.root = segment_node
-            elif node.left == trapezoid.leaf:
-                node.left = segment_node
+            if to_swap == self.root:
+                self.root.node = segment.node
             else:
-                node.right = segment_node
+                to_swap.node = segment.node
 
-            segment_node.left = up.leaf
-            segment_node.right = down.leaf
+            segment.node.left = up.node
+            segment.node.right = down.node
 
-    def update_multiple(self, trapezoids: list[Trapezoid], segment: Segment, splitted_trapezoids: dict):
+
+    def update_multiple(self, trapezoids: list[Trapezoid], s: Segment, splitted_trapezoids: dict):
         n = len(trapezoids)
 
         for i in range(n):
             trapezoid = trapezoids[i]
-            node = self.find_parent(self.root, trapezoid.leaf)
-            segment_node = YNode(segment)
+            to_swap = self.find_node(trapezoid.node)
+            segment = Node(YNode(s))
 
-            if node.left == trapezoid.leaf:
-                node.left = segment_node
-            else:
-                node.right = segment_node
+            to_swap.node = segment.node
 
-            segment_node.left = splitted_trapezoids[trapezoids[i]][0].leaf
-            segment_node.right = splitted_trapezoids[trapezoids[i]][1].leaf
+            segment.node.left = splitted_trapezoids[trapezoids[i]][0].node
+            segment.node.right = splitted_trapezoids[trapezoids[i]][1].node
