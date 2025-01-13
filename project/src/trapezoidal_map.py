@@ -12,7 +12,8 @@ class TrapezoidalMap:
         self.vis = Visualizer()
         self.vis.add_line_segment([self.rect_bound.up.to_tuple(), self.rect_bound.down.to_tuple()], color='red')
         ls = self.vis.add_line_segment(self.rect_bound.get_segments(as_tuples=True))
-        self.get_remove_handle = {self.rect_bound : ls}
+        self.get_remove_handle = {self.rect_bound: ls}
+        self.update_visualizer = False
 
     def build_trapezoidal_map(self):
         for i in range(len(self.segments)):
@@ -207,7 +208,9 @@ class TrapezoidalMap:
             dict_to_visualize = {}
             for t in list_to_visualize:
                 dict_to_visualize[t] = [trapezoids[0]]
-            self.__update_visualizer([left, top, bottom, right], s, dict_to_visualize)
+
+            if self.update_visualizer:
+                self.__update_visualizer([left, top, bottom, right], s, dict_to_visualize)
 
             trapezoids[0].node = Node(Leaf(trapezoids[0]))
             top.node = Node(Leaf(top))
@@ -270,7 +273,8 @@ class TrapezoidalMap:
             if right:
                 right.node = Node(Leaf(right))
 
-            self.__update_visualizer([left] + tops + bottoms + [right], s, from_trapezoid)
+            if self.update_visualizer:
+                self.__update_visualizer([left] + tops + bottoms + [right], s, from_trapezoid)
 
             self.tree.update_single(trapezoids[0], s, split_trapezoids[trapezoids[0]][0], split_trapezoids[trapezoids[0]][1], left, None)
             self.tree.update_multiple(trapezoids[1:-1], s, split_trapezoids)
